@@ -2,7 +2,26 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { ApiError, apiRequest } from "../api/client";
-import type { Discipline, DocumentType, KeuringDocument, Site } from "../api/types";
+import type { AIProposal, Discipline, DocumentType, KeuringDocument, Site } from "../api/types";
+
+const FIELD_LABELS: Record<string, string> = {
+  EXAMINATION_DATE: "Datum van onderzoek",
+  REPORT_DATE: "Datum van verslag",
+  INSPECTION_STATUS: "Keuringsstatus",
+};
+
+const STATUS_VALUE_LABELS: Record<string, string> = {
+  APPROVED: "Goedgekeurd",
+  APPROVED_WITH_REMARKS: "Goedgekeurd met opmerkingen",
+  REJECTED: "Afgekeurd",
+};
+
+function formatProposedValue(proposal: AIProposal): string {
+  if (proposal.field_code === "INSPECTION_STATUS") {
+    return STATUS_VALUE_LABELS[proposal.proposed_value.value] ?? proposal.proposed_value.value;
+  }
+  return proposal.proposed_value.value;
+}
 
 export function DocumentsPage() {
   const [sites, setSites] = useState<Site[]>([]);
@@ -16,6 +35,11 @@ export function DocumentsPage() {
   const [disciplineId, setDisciplineId] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState("");
   const [file, setFile] = useState<File | null>(null);
+
+  const [reviewDocumentId, setReviewDocumentId] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<AIProposal[]>([]);
+  const [correctingId, setCorrectingId] = useState<string | null>(null);
+  const [correctionValue, setCorrectionValue] = useState("");
 
   async function loadData() {
     try {
@@ -62,6 +86,47 @@ export function DocumentsPage() {
     }
   }
 
+  async function openReview(documentId: string) {
+    setError(null);
+    setReviewDocumentId(documentId);
+    setCorrectingId(null);
+    try {
+      const result = await apiRequest<AIProposal[]>(`/documents/${documentId}/ai-proposals`);
+      setProposals(result);
+    } catch {
+      setError("Kon AI-voorstellen niet laden.");
+    }
+  }
+
+  async function handleConfirm(proposalId: string) {
+    if (!reviewDocumentId) return;
+    setError(null);
+    try {
+      await apiRequest(`/documents/${reviewDocumentId}/ai-proposals/${proposalId}/confirm`, { method: "POST" });
+      await openReview(reviewDocumentId);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof ApiError ? String(err.detail) : "Bevestigen mislukt.");
+    }
+  }
+
+  async function handleCorrect(proposalId: string) {
+    if (!reviewDocumentId) return;
+    setError(null);
+    try {
+      await apiRequest(`/documents/${reviewDocumentId}/ai-proposals/${proposalId}/correct`, {
+        method: "POST",
+        body: { value: correctionValue },
+      });
+      setCorrectingId(null);
+      setCorrectionValue("");
+      await openReview(reviewDocumentId);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof ApiError ? String(err.detail) : "Corrigeren mislukt.");
+    }
+  }
+
   return (
     <div>
       <h2>Documenten</h2>
@@ -75,6 +140,7 @@ export function DocumentsPage() {
             <th>Type</th>
             <th>AI-status</th>
             <th>Validatiestatus</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -84,10 +150,94 @@ export function DocumentsPage() {
               <td>{documentTypes.find((t) => t.id === doc.document_type_id)?.name ?? doc.document_type_id}</td>
               <td>{doc.ai_status}</td>
               <td>{doc.validation_status}</td>
+              <td>
+                {(doc.ai_status === "COMPLETED" || doc.ai_status === "NO_PROPOSALS") && (
+                  <button type="button" className="link-button" onClick={() => openReview(doc.id)}>
+                    AI-voorstellen
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {reviewDocumentId && (
+        <section>
+          <h3>AI-voorstellen</h3>
+          {proposals.length === 0 && <p>Geen AI-voorstellen voor dit document.</p>}
+          <table>
+            <thead>
+              <tr>
+                <th>Veld</th>
+                <th>Voorstel</th>
+                <th>Zekerheid</th>
+                <th>Bron</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {proposals.map((p) => (
+                <tr key={p.id}>
+                  <td>{FIELD_LABELS[p.field_code] ?? p.field_code}</td>
+                  <td>{formatProposedValue(p)}</td>
+                  <td>{p.confidence !== null ? `${Math.round(p.confidence * 100)}%` : "-"}</td>
+                  <td className="hint">{p.source_snippet ?? "-"}</td>
+                  <td>{p.is_reviewed ? "Gecontroleerd" : "Te controleren"}</td>
+                  <td>
+                    {!p.is_reviewed && correctingId !== p.id && (
+                      <>
+                        <button type="button" className="link-button" onClick={() => handleConfirm(p.id)}>
+                          Bevestigen
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => {
+                            setCorrectingId(p.id);
+                            setCorrectionValue(p.proposed_value.value);
+                          }}
+                        >
+                          Corrigeren
+                        </button>
+                      </>
+                    )}
+                    {correctingId === p.id && (
+                      <span>
+                        {p.field_code === "INSPECTION_STATUS" ? (
+                          <select value={correctionValue} onChange={(e) => setCorrectionValue(e.target.value)}>
+                            {Object.entries(STATUS_VALUE_LABELS).map(([code, label]) => (
+                              <option key={code} value={code}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="date"
+                            value={correctionValue}
+                            onChange={(e) => setCorrectionValue(e.target.value)}
+                          />
+                        )}
+                        <button type="button" onClick={() => handleCorrect(p.id)}>
+                          Opslaan
+                        </button>
+                        <button type="button" className="link-button" onClick={() => setCorrectingId(null)}>
+                          Annuleren
+                        </button>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="link-button" onClick={() => setReviewDocumentId(null)}>
+            Sluiten
+          </button>
+        </section>
+      )}
 
       <h3>Document uploaden</h3>
       <form onSubmit={handleUpload}>

@@ -70,6 +70,42 @@ specificatie staat in [`docs/`](docs/); deze iteratie volgt de
   gemeenschappelijke acties; de overige schermen zijn nog niet vertaald
   (zie "Bekende vereenvoudigingen").
 - **"Problemen met aanmelden?"-link** op het aanmeldscherm (docs/07 §5.2).
+- **AI-documentanalyse** (docs/02 §5, docs/01 "Herkende gegevens") — werkende
+  end-to-end pijplijn, geen stub:
+  - **Tekstextractie**: PDF via `pdfplumber`, foto's (JPG/JPEG) via Tesseract
+    OCR (Nederlands + Engels taalpakket). Beide echt getest, inclusief een
+    geval waarbij OCR een label verkeerd las (`"Resultaat"` → `"Pesultat"`) -
+    de veldherkenning bleef toch correct omdat die op sleutelwoorden matcht,
+    niet op het exacte label.
+  - **Veldherkenning**: regelgebaseerde motor (standaard, altijd beschikbaar,
+    geen netwerk nodig) voor datum van onderzoek, datum van verslag en
+    keuringsstatus, met bronfragment en betrouwbaarheidsscore per veld. Site
+    en discipline worden bewust niet opnieuw herkend - die zijn al verplichte
+    invoer bij upload.
+  - **Optioneel LLM-gatewaypad**: wanneer `AI_GATEWAY_URL` is ingesteld,
+    wordt een OpenAI-compatibele chat-completions-aanroep gedaan (bv. naar
+    een lokale vLLM/Ollama-server) met een schema-gestuurde prompt, met
+    terugval naar de regelgebaseerde motor bij elke fout. Dit pad kon in deze
+    omgeving niet tegen een echte modelserver getest worden (die
+    infrastructuur bestaat hier niet) - alleen de regelgebaseerde motor is
+    dus daadwerkelijk geverifieerd.
+  - **Verwerking**: `ai_jobs`/`ai_field_predictions`/`ai_feedback`-tabellen,
+    een echte Celery-taak (`app/workers/ai_jobs.py`, niet langer een
+    `NotImplementedError`-scaffold) die start bij upload van een document
+    waarvan het documenttype `supports_ai_analysis` heeft, en een
+    review-UI op het Documentenscherm (bevestigen/corrigeren per veld,
+    beide paden schrijven een `ai_feedback`-record voor de leerlus uit
+    docs/01 §"Leren uit menselijke correcties").
+  - Getest met een echte Celery-worker tegen Redis: PDF-upload → job
+    voltooid → voorstellen zichtbaar in de UI → bevestigen/corrigeren past
+    het onderliggende keuringsrapport aan (met `AI_PROPOSAL` als
+    datumbron) → feedback-audittrail geverifieerd in de database.
+  - Tijdens het testen kwam een echte robuustheidsfout aan het licht:
+    `POST .../correct` met een niet-parseerbare datum gaf een onbehandelde
+    `ValueError` en dus een 500 in plaats van een nette 400 — gefixt, en de
+    frontend gebruikt nu een echt datumveld/keuzelijst per veldtype in
+    plaats van een vrij tekstveld, zodat deze fout in de praktijk niet meer
+    kan optreden.
 
 Tijdens het bouwen van het beveiligingsscherm zijn drie reële fouten in de
 eerder gebouwde authenticatielaag gevonden en gecorrigeerd (bevestigd met
@@ -91,12 +127,16 @@ Deze onderdelen staan wel in de specificatie maar zijn in deze iteratie
 overgeslagen om een samenhangende, geteste kernstroom op te leveren in
 plaats van veel losse, ongeteste fragmenten:
 
-- **AI-verwerking** (OCR, Vision, LLM-analyse, promptbeheer, modelbeheer) —
-  `docs/04` en `docs/02` §5. Er staat een `app/workers/ai_jobs.py`-scaffold
-  klaar die expliciet `NotImplementedError` opwerpt; er is geen aansluiting
-  op een echte AI-server.
-- **Menselijke correcties / feedbackregistratie** voor het verbeteren van
-  AI-herkenning (`ai_feedback`, kwaliteitsscherm) — hangt af van AI-verwerking.
+- **Vision-analyse en spraak** (typeplaatjes, schadeherkenning, STT) —
+  `docs/04` §5.2, §9-10. Alleen tekst-OCR is gebouwd, geen beeldanalyse.
+- **Modelversiebeheer, promptversiebeheer en kwaliteitsdashboard**
+  (`ai_models`, `ai_prompts`, evaluatie/promotieworkflow) — `docs/02` §5.2,
+  §5.3, docs/01 "Kwaliteitsbewaking". De huidige `ai_jobs` slaat wel
+  `model_identifier` op per job, maar er is geen beheer-UI of
+  versie-vergelijking.
+- **Automatische kennisregels** uit terugkerende correcties (docs/01
+  "Automatische patroonregels") — feedback wordt vastgelegd, maar niet
+  automatisch omgezet naar goedgekeurde regels.
 - **Kennisbank / RAG** (`knowledge_entities`, `knowledge_rules`,
   `knowledge_chunks`, embeddings, pgvector) — `docs/04`.
 - **Fotoverwerking in batch** (`photo_batches`, EXIF-datumherkenning,
@@ -147,3 +187,11 @@ plaats van veel losse, ongeteste fragmenten:
   Systeemstatus tonen nog uitsluitend Nederlandse tekst — de architectuur
   (`LanguageContext`, woordenboeken per taal) is aanwezig om dit
   schermgewijs uit te breiden.
+- AI-veldherkenning beperkt zich tot PDF en JPG/JPEG (geen DWG/XLSX, die
+  zijn geen documentinhoud om tekstueel te analyseren) en tot drie velden
+  (datum van onderzoek, datum van verslag, keuringsstatus). Bevindingen,
+  handtekeningen, tabelstructuren en meetwaarden worden niet herkend.
+- Er is geen retry-endpoint voor mislukte AI-jobs (`POST
+  /ai/jobs/{id}/retry` uit docs/05 §13); een mislukte job toont
+  `document.ai_status = "FAILED"` maar moet momenteel opnieuw getriggerd
+  worden door een nieuwe versie te uploaden.

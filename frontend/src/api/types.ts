@@ -102,6 +102,15 @@ export interface KeuringDocument {
   row_version: number;
 }
 
+export interface AIProposal {
+  id: string;
+  field_code: "EXAMINATION_DATE" | "REPORT_DATE" | "INSPECTION_STATUS";
+  proposed_value: { value: string };
+  confidence: number | null;
+  source_snippet: string | null;
+  is_reviewed: boolean;
+}
+
 export interface InspectionStatus {
   id: string;
   code: string;

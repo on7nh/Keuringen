@@ -1,3 +1,4 @@
+from app.models.ai import AIFeedback, AIFieldPrediction, AIJob
 from app.models.audit import AuditLog
 from app.models.auth import (
     AuthenticationEvent,
@@ -28,6 +29,9 @@ from app.models.rbac import Permission, Role, RolePermission, UserOrganizationRo
 from app.models.user import User
 
 __all__ = [
+    "AIFeedback",
+    "AIFieldPrediction",
+    "AIJob",
     "AuditLog",
     "AuthenticationEvent",
     "OrganizationAuthenticationPolicy",

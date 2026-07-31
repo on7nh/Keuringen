@@ -23,4 +23,9 @@ celery_app.conf.update(
     },
 )
 
-celery_app.autodiscover_tasks(["app.workers"])
+# autodiscover_tasks() looks for a Django-style "tasks.py" per package,
+# which doesn't match this project's module layout (app/workers/ai_jobs.py,
+# app/workers/reminders.py) - import them explicitly instead so their
+# @celery_app.task-decorated functions actually get registered.
+import app.workers.ai_jobs  # noqa: E402,F401
+import app.workers.reminders  # noqa: E402,F401

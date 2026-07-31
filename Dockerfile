@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git tesseract-ocr tesseract-ocr-nld \
     && rm -rf /var/lib/apt/lists/*
 
 # Fixed UID/GID (rather than a dynamically assigned system user) so NAS

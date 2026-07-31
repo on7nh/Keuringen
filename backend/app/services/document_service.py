@@ -117,11 +117,11 @@ def upload_document(
                 version_number = 1
 
                 if document_type.requires_inspection_data:
-                    # AI-driven metadata extraction (docs/02 section 5) is
-                    # not yet implemented, so the report starts blank with
-                    # the mandatory UNCONFIRMED placeholder status, per
-                    # docs/01: "Elke keuring moet manueel gecontroleerd en
-                    # bevestigd worden."
+                    # The report always starts with the mandatory UNCONFIRMED
+                    # placeholder status, per docs/01: "Elke keuring moet
+                    # manueel gecontroleerd en bevestigd worden." AI field
+                    # extraction below only produces proposals for review -
+                    # it never sets this directly.
                     unconfirmed = (
                         db.query(InspectionStatus)
                         .filter(InspectionStatus.code == UNCONFIRMED_STATUS_CODE)
@@ -166,6 +166,12 @@ def upload_document(
             document.current_version_id = version.id
             db.commit()
             db.refresh(document)
+
+            if document_type.supports_ai_analysis and extension in (".pdf", ".jpg", ".jpeg"):
+                from app.workers.ai_jobs import run_document_field_extraction
+
+                run_document_field_extraction.delay(str(version.id))
+
             return document
     finally:
         temp_path.unlink(missing_ok=True)

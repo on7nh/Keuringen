@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     document_storage_path: str = "/data/documents"
 
     ai_gateway_url: str | None = None
+    ai_gateway_model: str = "local-llm"
+    ai_gateway_timeout_seconds: int = 30
 
     # Read-only update check (see docs/06 and app/api/v1/system.py). Points
     # at the repo checkout bind-mounted into the container so the check can
