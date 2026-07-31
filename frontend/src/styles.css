@@ -124,6 +124,11 @@ section {
   color: #666;
 }
 
+.status-update_available {
+  background: #fff3cd;
+  color: #8a6100;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

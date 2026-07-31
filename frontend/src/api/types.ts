@@ -80,7 +80,7 @@ export interface InspectionStatus {
 export interface SystemStatusCheck {
   name: string;
   label: string;
-  status: "ok" | "error" | "not_configured" | "unknown";
+  status: "ok" | "error" | "not_configured" | "unknown" | "update_available";
   detail: string | null;
   latency_ms: number | null;
 }

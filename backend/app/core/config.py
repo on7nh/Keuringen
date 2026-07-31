@@ -23,6 +23,13 @@ class Settings(BaseSettings):
 
     ai_gateway_url: str | None = None
 
+    # Read-only update check (see docs/06 and app/api/v1/system.py). Points
+    # at the repo checkout bind-mounted into the container so the check can
+    # compare the running commit against the branch's latest on GitHub,
+    # without granting the app any ability to change the running containers.
+    repo_path: str = "/repo"
+    repo_branch: str = "main"
+
     jwt_secret: str = "change-me-in-env-min-32-bytes-long"
     jwt_algorithm: str = "HS256"
     jwt_access_token_minutes: int = 15

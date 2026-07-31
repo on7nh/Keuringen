@@ -33,6 +33,18 @@ specificatie staat in [`docs/`](docs/); deze iteratie volgt de
   passkey), dashboard met vervaloverzicht, Sites-, Documenten- en
   Keuringenschermen, geïntegreerd geserveerd via FastAPI (één image, poort
   8080, per docs/20).
+- **Beheer (Admin) scherm** — organisaties, disciplines en documenttypes
+  aanmaken vanuit de UI (voorheen alleen via de API).
+- **Systeemstatus scherm** — `GET /api/v1/system/status` toont PostgreSQL-,
+  Redis- en documentopslag-bereikbaarheid (met schrijftest en vrije ruimte),
+  plus een alleen-lezen software-updatecheck die het draaiende commit
+  vergelijkt met de laatste commit op de gevolgde branch (via een read-only
+  bind mount van de repository + `git ls-remote`, geen Docker-socket-
+  toegang). De update-check toont enkel het exacte commando om handmatig
+  te updaten; er is bewust geen "1-klik herstart"-knop gebouwd, aangezien
+  dat de webcontainer toegang tot de Docker-daemon van de host zou moeten
+  geven — een aanzienlijke uitbreiding van het aanvalsoppervlak die niet
+  stilzwijgend wordt toegevoegd.
 - **Infrastructuur** — Dockerfile (multi-stage: React-build + FastAPI-image),
   `docker-compose.yml` conform docs/20 (web/worker/scheduler/redis, één
   gepubliceerde poort), `docker-compose.override.yml` met een lokale
@@ -83,3 +95,8 @@ plaats van veel losse, ongeteste fragmenten:
   Voor bestanden tot 100 MB werkt de huidige aanpak betrouwbaar (getest).
 - Malware-scanning is een placeholder-status (`SKIPPED`); er is geen
   scanner aangesloten.
+- De NAS-koppeling is en blijft een hostniveau-instelling (NFS/SMB-mount
+  naar `DOCUMENT_STORAGE_PATH`, per docs/20 §12), niet iets dat via de
+  applicatie met opslaggegevens/credentials wordt geconfigureerd. Het
+  Systeemstatus-scherm maakt een gebroken of ontbrekende mount zichtbaar
+  (met pad en foutmelding) zodat die op de host kan worden opgelost.

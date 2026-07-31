@@ -8,6 +8,7 @@ const STATUS_LABEL: Record<string, string> = {
   error: "Fout",
   not_configured: "Niet geconfigureerd",
   unknown: "Onbekend",
+  update_available: "Update beschikbaar",
 };
 
 export function StatusPage() {
