@@ -15,7 +15,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system app && adduser --system --ingroup app app
+# Fixed UID/GID (rather than a dynamically assigned system user) so NAS
+# export permissions can be aligned reliably, e.g. on the Synology side:
+#   chown -R 10001:10001 /volume1/keuringen
+RUN addgroup --gid 10001 app && adduser --uid 10001 --gid 10001 --system app
 
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
