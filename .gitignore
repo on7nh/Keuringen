@@ -1,0 +1,26 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+backend/frontend-dist/
+*.tsbuildinfo
+
+# Data / uploads
+data/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

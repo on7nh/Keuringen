@@ -1,0 +1,137 @@
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+
+import { ApiError, apiRequest } from "../api/client";
+import type { Discipline, DocumentType, KeuringDocument, Site } from "../api/types";
+
+export function DocumentsPage() {
+  const [sites, setSites] = useState<Site[]>([]);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
+  const [documents, setDocuments] = useState<KeuringDocument[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [siteId, setSiteId] = useState("");
+  const [disciplineId, setDisciplineId] = useState("");
+  const [documentTypeId, setDocumentTypeId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  async function loadData() {
+    try {
+      const [siteList, disciplineList, docTypeList, documentList] = await Promise.all([
+        apiRequest<Site[]>("/sites"),
+        apiRequest<Discipline[]>("/disciplines"),
+        apiRequest<DocumentType[]>("/document-types"),
+        apiRequest<KeuringDocument[]>("/documents"),
+      ]);
+      setSites(siteList);
+      setDisciplines(disciplineList);
+      setDocumentTypes(docTypeList);
+      setDocuments(documentList);
+      if (siteList.length > 0) setSiteId((c) => c || siteList[0].id);
+      if (disciplineList.length > 0) setDisciplineId((c) => c || disciplineList[0].id);
+      if (docTypeList.length > 0) setDocumentTypeId((c) => c || docTypeList[0].id);
+    } catch {
+      setError("Kon documentgegevens niet laden.");
+    }
+  }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  async function handleUpload(e: FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("site_id", siteId);
+      formData.append("discipline_id", disciplineId);
+      formData.append("document_type_id", documentTypeId);
+      formData.append("file", file);
+
+      await apiRequest("/documents/upload", { method: "POST", body: formData, isForm: true });
+      setMessage("Document geüpload.");
+      setFile(null);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof ApiError ? String(err.detail) : "Upload mislukt.");
+    }
+  }
+
+  return (
+    <div>
+      <h2>Documenten</h2>
+      {error && <p className="error">{error}</p>}
+      {message && <p className="success">{message}</p>}
+
+      <table>
+        <thead>
+          <tr>
+            <th>Discipline</th>
+            <th>Type</th>
+            <th>AI-status</th>
+            <th>Validatiestatus</th>
+          </tr>
+        </thead>
+        <tbody>
+          {documents.map((doc) => (
+            <tr key={doc.id}>
+              <td>{disciplines.find((d) => d.id === doc.discipline_id)?.name ?? doc.discipline_id}</td>
+              <td>{documentTypes.find((t) => t.id === doc.document_type_id)?.name ?? doc.document_type_id}</td>
+              <td>{doc.ai_status}</td>
+              <td>{doc.validation_status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h3>Document uploaden</h3>
+      <form onSubmit={handleUpload}>
+        <label>
+          Site
+          <select value={siteId} onChange={(e) => setSiteId(e.target.value)} required>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Discipline
+          <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} required>
+            {disciplines.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Documenttype
+          <select value={documentTypeId} onChange={(e) => setDocumentTypeId(e.target.value)} required>
+            {documentTypes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Bestand (PDF, JPG, DWG, XLSX - max 100 MB)
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.dwg,.xlsx"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            required
+          />
+        </label>
+        <button type="submit">Uploaden</button>
+      </form>
+    </div>
+  );
+}

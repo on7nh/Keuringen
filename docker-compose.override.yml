@@ -1,0 +1,44 @@
+# Automatically merged on top of docker-compose.yml by `docker compose up`.
+# Adds a local PostgreSQL container for development only - production
+# environments use a separate database host (see docs/02 and docs/06) and
+# should run `docker compose -f docker-compose.yml up` without this file.
+services:
+  web:
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    environment:
+      POSTGRES_HOST: db
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-keuringen}
+      POSTGRES_USER: ${POSTGRES_USER:-keuringen_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keuringen_app}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./backend/scripts/init-db-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql:ro
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-keuringen_app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
