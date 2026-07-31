@@ -224,13 +224,8 @@ def recovery_code_use(payload: RecoveryCodeUseRequest, request: Request, db: Ses
 
 @router.post("/step-up/options", response_model=StepUpOptionsResponse)
 def step_up_options(payload: StepUpOptionsRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    challenge = auth_service.build_step_up_challenge_response(db, user)
-    db.commit()
-    return StepUpOptionsResponse(
-        step_up_id=challenge["challenge_id"],
-        allowed_methods=challenge["allowed_methods"],
-        expires_at=challenge["expires_at"],
-    )
+    options = auth_service.build_step_up_options(db, user)
+    return StepUpOptionsResponse(**options)
 
 
 @router.post("/step-up/totp/verify", status_code=status.HTTP_204_NO_CONTENT)
@@ -273,10 +268,22 @@ def logout(session: UserSession | None = Depends(get_current_session), db: Sessi
         auth_service.revoke_session(db, session, reason="LOGOUT")
 
 
-@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
-def logout_all(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    sessions = db.query(UserSession).filter(UserSession.user_id == user.id, UserSession.revoked_at.is_(None)).all()
-    for s in sessions:
+@router.post(
+    "/logout-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_step_up("SESSIONS_REVOKE_ALL"))],
+)
+def logout_all(
+    user: User = Depends(get_current_user),
+    current_session: UserSession | None = Depends(get_current_session),
+    db: Session = Depends(get_db),
+):
+    """Revokes all *other* sessions, per docs/07 §18.5 ("Alle andere sessies
+    beëindigen") - the caller's own session is left untouched."""
+    query = db.query(UserSession).filter(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+    if current_session is not None:
+        query = query.filter(UserSession.id != current_session.id)
+    for s in query.all():
         s.revoked_at = auth_service.now()
         s.revocation_reason = "LOGOUT_ALL"
     db.commit()
@@ -316,6 +323,8 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
         email=user.email,
         display_name=user.display_name,
         is_system_admin=user.is_system_admin,
+        strong_authentication_required=auth_service.strong_auth_required(user),
+        active_strong_auth_methods=auth_service.active_strong_auth_method_types(db, user),
         organization_roles=[
             {"organization_id": str(r.organization_id), "role_id": str(r.role_id)}
             for r in user.organization_roles

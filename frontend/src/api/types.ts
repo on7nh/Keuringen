@@ -12,8 +12,40 @@ export interface Me {
   email: string;
   display_name: string;
   is_system_admin: boolean;
+  strong_authentication_required: boolean;
+  active_strong_auth_methods: string[];
   organization_roles: { organization_id: string; role_id: string }[];
   site_roles: { site_id: string; role_id: string }[];
+}
+
+export interface Passkey {
+  id: string;
+  device_name: string;
+  authenticator_attachment: string | null;
+  registered_at: string;
+  last_used_at: string | null;
+}
+
+export interface UserSession {
+  id: string;
+  device_label: string | null;
+  ip_address: string | null;
+  authentication_method: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+}
+
+export interface RecoveryCodesStatus {
+  remaining_count: number;
+  generated_at: string | null;
+}
+
+export interface TotpSetupResponse {
+  registration_id: string;
+  secret: string;
+  otpauth_uri: string;
+  qr_code_data_uri: string;
 }
 
 export interface Organization {

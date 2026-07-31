@@ -26,6 +26,38 @@ export class ApiError extends Error {
   }
 }
 
+/** Normalizes the two error-body shapes the backend uses: a plain string
+ * detail (e.g. "TOTP_INVALID") or a nested {error: {code, ...}} detail
+ * (e.g. STEP_UP_REQUIRED). Returns null for anything else. */
+export function getErrorCode(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  const body = err.detail as { detail?: unknown } | undefined;
+  const detail = body?.detail;
+  if (typeof detail === "string") return detail;
+  const nested = detail as { error?: { code?: string } } | undefined;
+  return nested?.error?.code ?? null;
+}
+
+/** Decodes the (unsigned, client-side only - never trusted for auth
+ * decisions) session_id claim from the current access token, purely so the
+ * UI can highlight "this is your current session" in the sessions list. */
+export function getCurrentSessionId(): string | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.session_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function getStepUpAction(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  const body = err.detail as { detail?: { error?: { details?: { intended_action?: string } } } } | undefined;
+  return body?.detail?.error?.details?.intended_action ?? null;
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;

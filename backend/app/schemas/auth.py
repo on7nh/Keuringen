@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -106,6 +106,7 @@ class StepUpOptionsResponse(BaseModel):
     step_up_id: uuid.UUID
     allowed_methods: list[str]
     expires_at: datetime
+    webauthn_options: dict | None = None
 
 
 class StepUpVerifyRequest(BaseModel):
@@ -130,11 +131,19 @@ class SessionOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("ip_address", mode="before")
+    @classmethod
+    def _stringify_ip(cls, value: object) -> str | None:
+        # psycopg returns ipaddress.IPv4Address/IPv6Address for INET columns.
+        return None if value is None else str(value)
+
 
 class MeResponse(BaseModel):
     id: uuid.UUID
     email: str
     display_name: str
     is_system_admin: bool
+    strong_authentication_required: bool
+    active_strong_auth_methods: list[str]
     organization_roles: list[dict]
     site_roles: list[dict]

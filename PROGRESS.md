@@ -50,6 +50,40 @@ specificatie staat in [`docs/`](docs/); deze iteratie volgt de
   gepubliceerde poort), `docker-compose.override.yml` met een lokale
   PostgreSQL-container voor ontwikkeling, Alembic-migraties (geverifieerd:
   volledige upgrade/downgrade-cyclus zonder schema drift).
+- **Beveiliging en aanmelden-scherm** (docs/07 §18) — volledig zelfbedieningsscherm
+  voor Passkeys (toevoegen, hernoemen, intrekken), TOTP (instellen, bevestigen,
+  verwijderen), herstelcodes (genereren, eenmalig tonen) en actieve sessies
+  (overzicht met "huidige sessie"-badge, individueel of gezamenlijk beëindigen).
+  Blokkeert het verwijderen van de laatste actieve methode in de UI zelf
+  (naast de bestaande backend-validatie).
+- **Step-up-authenticatiemodal** (docs/07 §19) — herbruikbare React-context
+  (`useStepUp`/`withStepUp`) die een `STEP_UP_REQUIRED`-fout opvangt, Passkey
+  of TOTP-bevestiging toont, en de oorspronkelijke actie automatisch hervat
+  na succes.
+- **Wizard voor eerste sterke-authenticatie-instelling** (docs/07 §5.6,
+  vereenvoudigd) — niet-wegklikbare banner op elke pagina wanneer sterke
+  authenticatie verplicht is maar nog geen methode is geregistreerd, met
+  directe link naar het beveiligingsscherm.
+- **Meertaligheidsbasis** (docs/07 §8) — `LanguageContext` met nl/en-
+  woordenboeken, automatische taaldetectie via de browser, taalkeuze in
+  navigatie en aanmeldscherm. Dekt vooralsnog navigatie, aanmeldscherm en
+  gemeenschappelijke acties; de overige schermen zijn nog niet vertaald
+  (zie "Bekende vereenvoudigingen").
+- **"Problemen met aanmelden?"-link** op het aanmeldscherm (docs/07 §5.2).
+
+Tijdens het bouwen van het beveiligingsscherm zijn drie reële fouten in de
+eerder gebouwde authenticatielaag gevonden en gecorrigeerd (bevestigd met
+een browsertest, niet alleen code-inspectie):
+
+1. `POST /auth/step-up/options` genereerde voor Passkey-stap-up nooit een
+   echte WebAuthn-challenge — elke Passkey-stap-up zou hebben gefaald.
+   Losgemaakt van de (wel correct werkende) inlogflow via een nieuwe
+   `build_step_up_options`.
+2. `GET /auth/sessions` crashte met een 500 zodra er sessies met een
+   IP-adres bestonden: psycopg geeft `ipaddress.IPv4Address` terug voor
+   `INET`-kolommen, wat Pydantic's `str`-veld niet accepteerde.
+3. `POST /auth/logout-all` trok ook de sessie van de aanroeper zelf in,
+   in plaats van alleen "alle *andere* sessies" zoals de spec vereist.
 
 ## Bewust nog niet gebouwd
 
@@ -85,6 +119,11 @@ plaats van veel losse, ongeteste fragmenten:
   controleert vandaag alleen systeembrede permissies via rollen, niet of de
   gebruiker specifiek toegang heeft tot de betrokken organisatie of Site.
   Voor productiegebruik moet dit nog verder afgedwongen worden per endpoint.
+- **Toestellen- en Onderhoudsbeheer** (docs/09–13) — een volledig tweede
+  module (toestelregistratie, QR-codes, onderhoud, storingen, herstellingen,
+  toestelkeuringen, MTTR/MTBF-rapportage, plus een eigen AI-analytics-laag
+  voor predictive maintenance). Nog niet gestart; qua omvang vergelijkbaar
+  met alles wat tot nu toe gebouwd is.
 
 ## Bekende vereenvoudigingen t.o.v. de spec
 
@@ -100,3 +139,11 @@ plaats van veel losse, ongeteste fragmenten:
   applicatie met opslaggegevens/credentials wordt geconfigureerd. Het
   Systeemstatus-scherm maakt een gebroken of ontbrekende mount zichtbaar
   (met pad en foutmelding) zodat die op de host kan worden opgelost.
+- De "eerste registratie"-wizard uit docs/07 §5.6 is vereenvoudigd tot een
+  niet-wegklikbare banner die naar het bestaande beveiligingsscherm linkt,
+  in plaats van een aparte stapsgewijze wizard-flow.
+- Meertaligheid dekt vooralsnog navigatie, aanmeldscherm en de kopteksten
+  van het beveiligingsscherm. Sites, Documenten, Keuringen, Beheer en
+  Systeemstatus tonen nog uitsluitend Nederlandse tekst — de architectuur
+  (`LanguageContext`, woordenboeken per taal) is aanwezig om dit
+  schermgewijs uit te breiden.

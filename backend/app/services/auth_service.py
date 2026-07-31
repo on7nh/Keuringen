@@ -119,6 +119,10 @@ def strong_auth_required(user: User) -> bool:
     return user.is_system_admin or user.strong_authentication_required
 
 
+def active_strong_auth_method_types(db: Session, user: User) -> list[str]:
+    return sorted({m.method_type for m in _active_strong_methods(db, user)})
+
+
 def build_step_up_challenge_response(db: Session, user: User) -> dict:
     strong_methods = _active_strong_methods(db, user)
     allowed = sorted({m.method_type for m in strong_methods})
@@ -139,6 +143,35 @@ def build_step_up_challenge_response(db: Session, user: User) -> dict:
         "challenge_id": challenge.id,
         "allowed_methods": allowed,
         "expires_at": challenge.expires_at,
+    }
+
+
+def build_step_up_options(db: Session, user: User) -> dict:
+    """Options for the dedicated step-up flow (docs/05 section 4.9),
+    distinct from build_step_up_challenge_response which only identifies
+    allowed methods for the login flow's STRONG_AUTH_REQUIRED response.
+
+    When Passkey is available, this embeds real WebAuthn authentication
+    options (per docs/05: "Voor Passkey kan dezelfde response direct
+    WebAuthn request options bevatten") so the frontend can drive
+    navigator.credentials.get() directly from this single call.
+    """
+    allowed = sorted({m.method_type for m in _active_strong_methods(db, user)})
+
+    if "PASSKEY" in allowed:
+        auth_options = build_authentication_options(db, user)
+        return {
+            "step_up_id": auth_options["challenge_id"],
+            "allowed_methods": allowed,
+            "expires_at": now() + timedelta(seconds=settings.webauthn_challenge_ttl_seconds),
+            "webauthn_options": auth_options["options"],
+        }
+
+    return {
+        "step_up_id": str(uuid.uuid4()),
+        "allowed_methods": allowed,
+        "expires_at": now() + timedelta(seconds=settings.webauthn_challenge_ttl_seconds),
+        "webauthn_options": None,
     }
 
 

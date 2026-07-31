@@ -5,12 +5,15 @@ import { useNavigate } from "react-router-dom";
 import { ApiError, apiRequest } from "../api/client";
 import type { LoginResponse } from "../api/types";
 import { isWebAuthnSupported, requestPasskeyAssertion } from "../api/webauthn";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 
 type Step = "credentials" | "totp";
 
 export function LoginPage() {
   const { onLoginSuccess } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("credentials");
@@ -21,6 +24,7 @@ export function LoginPage() {
   const [allowedMethods, setAllowedMethods] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   async function handleCredentialsSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,7 +55,7 @@ export function LoginPage() {
         }
       }
     } catch (err) {
-      setError(err instanceof ApiError ? String(err.detail) : "Aanmelden mislukt.");
+      setError(err instanceof ApiError ? String(err.detail) : t("login.genericError"));
     } finally {
       setBusy(false);
     }
@@ -78,7 +82,9 @@ export function LoginPage() {
         navigate("/");
       }
     } catch (err) {
-      setError(err instanceof ApiError ? "Passkey-aanmelding mislukt." : "Passkey niet beschikbaar of geannuleerd.");
+      // Per docs/07 §5.4: a cancelled/failed passkey ceremony is not shown
+      // as an alarming failure state, just a neutral message to retry.
+      setError(err instanceof ApiError ? t("login.genericError") : "Aanmelding geannuleerd. Probeer opnieuw.");
     } finally {
       setBusy(false);
     }
@@ -100,7 +106,8 @@ export function LoginPage() {
         navigate("/");
       }
     } catch (err) {
-      setError(err instanceof ApiError ? "Ongeldige code." : "Verificatie mislukt.");
+      setError(err instanceof ApiError ? "Ongeldige code." : t("login.genericError"));
+      setCode("");
     } finally {
       setBusy(false);
     }
@@ -109,12 +116,23 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Digitaal Keurings- en Documentbeheer</h1>
+        <div className="login-card-header">
+          <img
+            src="/logo.png"
+            alt=""
+            className="login-logo"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <LanguageSwitcher />
+        </div>
+        <h1>{t("app.title")}</h1>
 
         {step === "credentials" && (
           <form onSubmit={handleCredentialsSubmit}>
             <label>
-              E-mailadres
+              {t("login.email")}
               <input
                 type="email"
                 required
@@ -124,7 +142,7 @@ export function LoginPage() {
               />
             </label>
             <label>
-              Wachtwoord
+              {t("login.password")}
               <input
                 type="password"
                 required
@@ -135,11 +153,11 @@ export function LoginPage() {
             </label>
             {error && <p className="error">{error}</p>}
             <button type="submit" disabled={busy}>
-              Aanmelden
+              {t("login.submit")}
             </button>
             {isWebAuthnSupported() && (
               <button type="button" className="link-button" disabled={busy} onClick={handlePasskeyLogin}>
-                Aanmelden met Passkey
+                {t("login.withPasskey")}
               </button>
             )}
           </form>
@@ -147,9 +165,9 @@ export function LoginPage() {
 
         {step === "totp" && (
           <form onSubmit={handleTotpSubmit}>
-            <p>Voer de code uit uw authenticator-app in.</p>
+            <p>{t("login.totpPrompt")}</p>
             <label>
-              TOTP-code
+              {t("login.totpCode")}
               <input
                 type="text"
                 inputMode="numeric"
@@ -161,7 +179,7 @@ export function LoginPage() {
             </label>
             {error && <p className="error">{error}</p>}
             <button type="submit" disabled={busy}>
-              Bevestigen
+              {t("common.confirm")}
             </button>
             <button
               type="button"
@@ -171,7 +189,7 @@ export function LoginPage() {
                 setError(null);
               }}
             >
-              Terug
+              {t("login.back")}
             </button>
           </form>
         )}
@@ -179,6 +197,11 @@ export function LoginPage() {
         {allowedMethods.length > 0 && step === "totp" && !allowedMethods.includes("TOTP") && (
           <p className="hint">Beschikbare methoden: {allowedMethods.join(", ")}</p>
         )}
+
+        <button type="button" className="link-button trouble-link" onClick={() => setShowHelp((v) => !v)}>
+          {t("login.troubleSigningIn")}
+        </button>
+        {showHelp && <p className="hint">{t("login.troubleSigningInHelp")}</p>}
       </div>
     </div>
   );
