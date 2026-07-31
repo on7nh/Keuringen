@@ -8,7 +8,17 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Keuringen</h1>
+        <div className="app-brand">
+          <img
+            src="/logo.png"
+            alt=""
+            className="app-logo"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <h1>Keuringen</h1>
+        </div>
         <nav>
           <NavLink to="/" end>
             Dashboard
@@ -16,6 +26,8 @@ export function Layout() {
           <NavLink to="/sites">Sites</NavLink>
           <NavLink to="/documents">Documenten</NavLink>
           <NavLink to="/inspections">Keuringen</NavLink>
+          {user?.is_system_admin && <NavLink to="/admin">Beheer</NavLink>}
+          {user?.is_system_admin && <NavLink to="/status">Systeemstatus</NavLink>}
         </nav>
         <div className="app-header-user">
           <span>{user?.display_name}</span>

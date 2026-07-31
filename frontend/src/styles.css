@@ -73,12 +73,55 @@ button:disabled {
   padding: 0.25rem 0;
 }
 
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label input {
+  width: auto;
+}
+
+section {
+  margin-bottom: 2rem;
+}
+
 .error {
   color: #b00020;
 }
 
 .success {
   color: #1e7d32;
+}
+
+.hint {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-ok {
+  background: #dcf5e3;
+  color: #1e7d32;
+}
+
+.status-error {
+  background: #fbdcdc;
+  color: #b00020;
+}
+
+.status-not_configured,
+.status-unknown {
+  background: #eee;
+  color: #666;
 }
 
 .app-shell {
@@ -94,6 +137,17 @@ button:disabled {
   padding: 0.75rem 1.5rem;
   background: #1f3d2b;
   color: white;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-logo {
+  height: 32px;
+  width: auto;
 }
 
 .app-header h1 {

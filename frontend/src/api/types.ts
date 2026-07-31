@@ -77,6 +77,19 @@ export interface InspectionStatus {
   display_order: number;
 }
 
+export interface SystemStatusCheck {
+  name: string;
+  label: string;
+  status: "ok" | "error" | "not_configured" | "unknown";
+  detail: string | null;
+  latency_ms: number | null;
+}
+
+export interface SystemStatus {
+  status: "ok" | "degraded";
+  checks: SystemStatusCheck[];
+}
+
 export interface InspectionReport {
   id: string;
   document_id: string;
